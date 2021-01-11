@@ -28,11 +28,12 @@ dependencies {
 	implementation(libraries.opentelemetry_sdk)
 	implementation(project(':exporter-metrics'))
 	implementation(project(':exporter-trace'))
+    compileOnly('com.linecorp.armeria:armeria:1.7.2')
 }
 
 jar.enabled = false
 
-tasks.build.dependsOn tasks.shadowJar
+tasks.assemble.dependsOn tasks.shadowJar
 
 shadowJar{
 	classifier = null

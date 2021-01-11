@@ -26,6 +26,7 @@ import com.google.cloud.trace.v2.stub.TraceServiceStub;
 import com.google.devtools.cloudtrace.v2.AttributeValue;
 import com.google.devtools.cloudtrace.v2.ProjectName;
 import com.google.devtools.cloudtrace.v2.Span;
+import io.opentelemetry.api.common.AttributeKey;
 import io.opentelemetry.sdk.common.CompletableResultCode;
 import io.opentelemetry.sdk.trace.data.SpanData;
 import io.opentelemetry.sdk.trace.export.SpanExporter;
@@ -35,6 +36,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 public class TraceExporter implements SpanExporter {
 
@@ -115,10 +117,23 @@ public class TraceExporter implements SpanExporter {
   public CompletableResultCode export(Collection<SpanData> spanDataList) {
     List<Span> spans = new ArrayList<>(spanDataList.size());
     for (SpanData spanData : spanDataList) {
-      spans.add(TraceTranslator.generateSpan(spanData, projectId, fixedAttributes));
+      final Map<AttributeKey<?>, Object> attributes = spanData.getAttributes().asMap();
+      final boolean healthCheck = Optional
+                .ofNullable((String) attributes.get(AttributeKey.stringKey("db.statement")))
+                .map(it -> it.contains("/* HealthCheck */"))
+                .orElse(false);
+        final boolean skip = (Boolean) attributes.getOrDefault(AttributeKey.booleanKey("skip"), false);
+        final int sze = Optional.ofNullable((String) attributes.get(AttributeKey.stringKey("exception")))
+        .map(String::length)
+        .orElse(0);
+      if (!"ebean.heartBeat".equals(attributes.get(AttributeKey.stringKey("thread.name"))) && !skip && !healthCheck) {
+        spans.add(TraceTranslator.generateSpan(spanData, projectId, fixedAttributes));
+      }
     }
 
-    cloudTraceClient.batchWriteSpans(projectName, spans);
+    if (!spans.isEmpty()) {
+        cloudTraceClient.batchWriteSpans(projectName, spans);
+    }
     return CompletableResultCode.ofSuccess();
   }
 

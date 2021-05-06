@@ -118,21 +118,25 @@ public class TraceExporter implements SpanExporter {
     List<Span> spans = new ArrayList<>(spanDataList.size());
     for (SpanData spanData : spanDataList) {
       final Map<AttributeKey<?>, Object> attributes = spanData.getAttributes().asMap();
-      final boolean healthCheck = Optional
-                .ofNullable((String) attributes.get(AttributeKey.stringKey("db.statement")))
-                .map(it -> it.contains("/* HealthCheck */"))
-                .orElse(false);
-        final boolean skip = (Boolean) attributes.getOrDefault(AttributeKey.booleanKey("skip"), false);
-        final int sze = Optional.ofNullable((String) attributes.get(AttributeKey.stringKey("exception")))
-        .map(String::length)
-        .orElse(0);
-      if (!"ebean.heartBeat".equals(attributes.get(AttributeKey.stringKey("thread.name"))) && !skip && !healthCheck) {
+      final boolean healthCheck =
+          Optional.ofNullable((String) attributes.get(AttributeKey.stringKey("db.statement")))
+              .map(it -> it.contains("/* HealthCheck */"))
+              .orElse(false);
+      final boolean skip =
+          (Boolean) attributes.getOrDefault(AttributeKey.booleanKey("skip"), false);
+      final int sze =
+          Optional.ofNullable((String) attributes.get(AttributeKey.stringKey("exception")))
+              .map(String::length)
+              .orElse(0);
+      if (!"ebean.heartBeat".equals(attributes.get(AttributeKey.stringKey("thread.name")))
+          && !skip
+          && !healthCheck) {
         spans.add(TraceTranslator.generateSpan(spanData, projectId, fixedAttributes));
       }
     }
 
     if (!spans.isEmpty()) {
-        cloudTraceClient.batchWriteSpans(projectName, spans);
+      cloudTraceClient.batchWriteSpans(projectName, spans);
     }
     return CompletableResultCode.ofSuccess();
   }
